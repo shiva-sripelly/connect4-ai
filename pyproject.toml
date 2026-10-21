@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "connect4-ai"
+version = "1.0.0"
+description = "Connect Four with an alpha-beta search AI, a FastAPI backend, a web UI and a CLI"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Thota Praveen Kumar" }]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+connect4 = "connect4.cli:main"
+
+[tool.setuptools]
+packages = ["connect4"]
+
+[tool.setuptools.package-data]
+connect4 = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

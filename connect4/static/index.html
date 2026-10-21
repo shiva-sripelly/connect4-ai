@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connect Four AI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --card: #1e293b; --board: #1d4ed8; --hole: #0f172a;
+      --human: #facc15; --ai: #ef4444; --text: #f1f5f9; --muted: #94a3b8; --win: #22c55e;
+    }
+    body {
+      min-height: 100vh; display: grid; place-items: center; padding: 16px;
+      background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .app { width: 100%; max-width: 460px; text-align: center; }
+    h1 { font-size: 1.8rem; }
+    .subtitle { color: var(--muted); font-size: 0.85rem; margin: 6px 0 18px; }
+    .controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; }
+    select, button {
+      background: var(--card); color: var(--text); border: 1px solid #334155;
+      padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; cursor: pointer;
+    }
+    .status { font-weight: 600; min-height: 1.5em; margin-bottom: 14px; }
+    .board {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+      background: var(--board); padding: 10px; border-radius: 14px;
+    }
+    .col { display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px; cursor: pointer; border-radius: 8px; }
+    .col:hover { background: rgba(255, 255, 255, 0.08); }
+    .board.locked .col { cursor: default; }
+    .board.locked .col:hover { background: none; }
+    .cell { aspect-ratio: 1; border-radius: 50%; background: var(--hole); transition: background 0.2s; }
+    .cell.p1 { background: var(--human); }
+    .cell.p2 { background: var(--ai); }
+    .cell.win { box-shadow: 0 0 0 4px var(--win); }
+    .legend { display: flex; justify-content: center; gap: 18px; margin-top: 14px; color: var(--muted); font-size: 0.85rem; }
+    .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>Connect Four AI</h1>
+    <p class="subtitle">Python backend · alpha-beta search · FastAPI</p>
+
+    <div class="controls">
+      <select id="difficulty" aria-label="Difficulty">
+        <option value="hard">Hard</option>
+        <option value="medium">Medium</option>
+        <option value="easy">Easy</option>
+      </select>
+      <button id="restart">New Game</button>
+    </div>
+
+    <p id="status" class="status" aria-live="polite">Your turn. Click a column.</p>
+    <div id="board" class="board" role="grid" aria-label="Connect Four board"></div>
+
+    <div class="legend">
+      <span><span class="dot" style="background: var(--human)"></span>You</span>
+      <span><span class="dot" style="background: var(--ai)"></span>AI</span>
+    </div>
+  </main>
+
+  <script>
+    const ROWS = 6, COLS = 7;
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const difficultyEl = document.getElementById('difficulty');
+
+    let board, winLine, locked;
+
+    const emptyBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+
+    function render() {
+      boardEl.innerHTML = '';
+      boardEl.classList.toggle('locked', locked);
+      const winning = new Set((winLine || []).map(([r, c]) => `${r},${c}`));
+      for (let c = 0; c < COLS; c++) {
+        const col = document.createElement('div');
+        col.className = 'col';
+        col.setAttribute('aria-label', `Column ${c + 1}`);
+        col.addEventListener('click', () => play(c));
+        for (let r = 0; r < ROWS; r++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (board[r][c]) cell.classList.add(`p${board[r][c]}`);
+          if (winning.has(`${r},${c}`)) cell.classList.add('win');
+          col.appendChild(cell);
+        }
+        boardEl.appendChild(col);
+      }
+    }
+
+    async function play(col) {
+      if (locked || board[0][col] !== 0) return;
+      locked = true;
+      statusEl.textContent = 'AI is thinking…';
+      render();
+      try {
+        const res = await fetch('/api/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ board, column: col, difficulty: difficultyEl.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Request failed');
+        board = data.board;
+        winLine = data.winning_line;
+        const messages = {
+          human_won: 'You win! 🎉',
+          ai_won: 'AI wins! 🤖',
+          draw: "It's a draw!",
+          in_progress: `AI played column ${data.ai_move + 1}. Your turn.`,
+        };
+        statusEl.textContent = messages[data.status];
+        locked = data.status !== 'in_progress';
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        locked = false;
+      }
+      render();
+    }
+
+    function restart() {
+      board = emptyBoard();
+      winLine = null;
+      locked = false;
+      statusEl.textContent = 'Your turn. Click a column.';
+      render();
+    }
+
+    document.getElementById('restart').addEventListener('click', restart);
+    difficultyEl.addEventListener('change', restart);
+    restart();
+  </script>
+</body>
+</html>
